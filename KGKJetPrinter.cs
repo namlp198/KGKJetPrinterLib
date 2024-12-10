@@ -1498,6 +1498,11 @@ namespace KGKJetPrinterLib
             }
         }
 
+        /// <summary>
+        /// Invoke Method Winform
+        /// </summary>
+        /// <param name="aMethod"></param>
+        /// <param name="ThrowMainFormMissingError"></param>
         private void InvokeMethod(MethodInvoker aMethod, bool ThrowMainFormMissingError = true)
         {
             try
@@ -1508,6 +1513,37 @@ namespace KGKJetPrinterLib
                     if (form.InvokeRequired)
                     {
                         form.Invoke(aMethod);
+                    }
+                    else
+                    {
+                        aMethod();
+                    }
+
+                    form = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                ProjectData.SetProjectError(ex);
+                Exception ex2 = ex;
+                ProjectData.ClearProjectError();
+            }
+        }
+
+        /// <summary>
+        /// Invoke Method WPF
+        /// </summary>
+        /// <param name="aMethod"></param>
+        private void InvokeMethod(MethodInvoker aMethod)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.Windows.Count != 0 && 0 == 0)
+                {
+                    var form = System.Windows.Application.Current.Windows[0];
+                    if (form.Dispatcher.CheckAccess())
+                    {
+                        form.Dispatcher.Invoke(aMethod);
                     }
                     else
                     {
