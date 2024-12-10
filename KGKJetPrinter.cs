@@ -1432,6 +1432,13 @@ namespace KGKJetPrinterLib
             return null;
         }
 
+        /// <summary>
+        /// Invoke Window Form
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="anAction"></param>
+        /// <param name="Arg"></param>
+        /// <param name="ThrowMainFormMissingError"></param>
         private void InvokeAction<T>(Action<T> anAction, T Arg, bool ThrowMainFormMissingError = true)
         {
             try
@@ -1442,6 +1449,38 @@ namespace KGKJetPrinterLib
                     if (form.InvokeRequired)
                     {
                         form.Invoke(anAction, Arg);
+                    }
+                    else
+                    {
+                        anAction(Arg);
+                    }
+
+                    form = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                ProjectData.SetProjectError(ex);
+                Exception ex2 = ex;
+                ProjectData.ClearProjectError();
+            }
+        }
+        /// <summary>
+        /// Invoke Wpf
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="anAction"></param>
+        /// <param name="Arg"></param>
+        private void InvokeAction<T>(Action<T> anAction, T Arg)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.Windows.Count != 0 && 0 == 0)
+                {
+                    var form = System.Windows.Application.Current.Windows[0];
+                    if (form.Dispatcher.CheckAccess())
+                    {
+                        form.Dispatcher.Invoke(anAction, Arg);
                     }
                     else
                     {
