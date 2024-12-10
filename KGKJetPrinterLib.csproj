@@ -32,9 +32,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
-    <Reference Include="ndev.LicenseKey">
-      <HintPath>..\ndev.LicenseKey\output\Debug\ndev.LicenseKey.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -54,6 +51,12 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ndev.LicenseKey\ndev.LicenseKey.csproj">
+      <Project>{67942863-9cbd-4f8b-a937-4c04a79fb584}</Project>
+      <Name>ndev.LicenseKey</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
