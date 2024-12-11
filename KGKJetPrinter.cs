@@ -794,6 +794,7 @@ namespace KGKJetPrinterLib
             Interaction.MsgBox("License Key is invalid");
         }
 
+        #region KGK Cmd
         public bool StartPrinting()
         {
             return SendControlCommand("\u0002SRC:0:1:1:\u0003");
@@ -804,26 +805,74 @@ namespace KGKJetPrinterLib
             return SendControlCommand("\u0002SRC:0:1:0:\u0003");
         }
 
+        /// <summary>
+        /// Choose message in at all messages
+        /// </summary>
+        /// <param name="nMessageNo"></param>
+        /// <returns></returns>
+        public bool SelectMessage(int nMessageNo)
+        {
+            string text = "\u0002SMN:0:1:" + nMessageNo + ":\u0003";
+            return SendControlCommand(text);
+        }
+        /// <summary>
+        /// Data return: 0:1:xx , where: xx is Message No
+        /// </summary>
+        /// <returns>0:1:xx</returns>
+        public bool GetMessageCurrent()
+        {
+            return SendCommand("\u0002GMN:0:1:\u0003", SendCommandType.GetData);
+        }
+        public void UpdateTextModule(TextModuleParameters textModule)
+        {
+
+        }
+        /// <summary>
+        /// Update Text Module without change attributes it is
+        /// </summary>
+        /// <param name="content"></param>
+        /// <returns></returns>
+        public bool UpdateTextModuleNoChangeAttributes(string content)
+        {
+            string text = "\u0002STM:1:1::3" + content + ":\u0003";
+            return SendControlCommand(text);
+        }
+
+        /// <summary>
+        /// Just get status of print head
+        /// </summary>
+        /// <returns>data return - 0:1:3:x: , where x is status of print head 
+        /// <list>
+        /// 0: Stopping, 
+        /// 1: Stopping and the cover opens, 
+        /// 2: Preparation of running, 
+        /// 3: Preparation of running and the cover opens, 
+        /// 4: Running, 
+        /// 5: Preparation of stopping, 
+        /// 6: While maintenance</list></returns>
+        public bool GetStatusMachineSimple()
+        {
+            return SendCommand("\u0002GSS:0:1:3:\u0003", SendCommandType.CheckState);
+        }
+
+        #endregion
+
         public bool StartJet()
         {
             return SendControlCommand("\u0002J\u0003");
         }
-
         public bool StopJet()
         {
             return SendControlCommand("\u0002K\u0003");
         }
-
         public bool ResetPrintCount()
         {
             return SendControlCommand("\u0002RA\u0003");
         }
-
         public bool ResetProductCount()
         {
             return SendControlCommand("\u0002RB\u0003");
         }
-
         public bool SelectMessage(string pMessageName)
         {
             if ((pMessageName.Length < 31) & (pMessageName.Length > 0))
@@ -833,12 +882,10 @@ namespace KGKJetPrinterLib
 
             return false;
         }
-
         public bool DeleteMessageText()
         {
             return SendControlCommand("\u0002C\u0003");
         }
-
         public bool UpdateMessageText(MessageDataField[] pDataField)
         {
             if (pDataField.Count() > 0)
@@ -870,7 +917,6 @@ namespace KGKJetPrinterLib
 
             return false;
         }
-
         public bool UpdateMessage(MessageDataField[] pDataField)
         {
             checked
@@ -909,7 +955,6 @@ namespace KGKJetPrinterLib
                 return false;
             }
         }
-
         public bool UpdateParameters(MessageParameters pParameter)
         {
             string booleanCode = GetBooleanCode(pParameter.Reverse);
@@ -932,28 +977,23 @@ namespace KGKJetPrinterLib
             string pCommand = "\u0002P" + booleanCode + booleanCode2 + widthCode + heightCode + gapCode + expireCode + hejraCode + delayCode + repeatCode + printedDotsCode + booleanCode3 + rLENCode + pParameter.Raster + "\u0003";
             return SendControlCommand(pCommand);
         }
-
         public bool ClearUserFieldData(string pUserFieldName)
         {
             return SendControlCommand("\u0002D" + pUserFieldName + "\u0003");
         }
-
         public bool UpdateCounterField(string pFieldName, string pStartValue, string pEndValue, byte pStep, Direction pDirection, byte pRepeat, string pPadding)
         {
             string pCommand = "\u0002U" + pFieldName + "\n" + pStartValue + "\n" + pEndValue + "\n" + Conversions.ToString(pStep) + "\n" + Conversions.ToString((int)pDirection) + "\n" + Conversions.ToString(pRepeat) + "\n" + pPadding + "\u0003";
             return SendControlCommand(pCommand);
         }
-
         public bool UpdateUserField(string pFieldName, string pUserData)
         {
             return SendControlCommand("\u0002U" + pFieldName + "\n" + pUserData + "\u0003");
         }
-
         public bool SetPrinterDateTime(DateTime pDate)
         {
             return SendControlCommand("\u0002Z" + pDate.ToString("yyMMddHHmmss") + "\u0003");
         }
-
         public string GetPrintCount()
         {
             string printerData = GetPrinterData("\u0002GA\u0003");
@@ -964,7 +1004,6 @@ namespace KGKJetPrinterLib
 
             return null;
         }
-
         public string GetProductCount()
         {
             string printerData = GetPrinterData("\u0002GB\u0003");
@@ -975,7 +1014,6 @@ namespace KGKJetPrinterLib
 
             return null;
         }
-
         public string GetCurrentSelectedMessageName()
         {
             return GetPrinterData("\u0002Q\u0003");
@@ -1083,18 +1121,31 @@ namespace KGKJetPrinterLib
         {
             byte[] arrivalData = _ArrivalData;
             PrinterState printerState = _PrinterState;
-            if (arrivalData.Count() > 8)
+            if (arrivalData.Count() >= 8)
             {
-                byte[] bytes = new byte[1] { arrivalData[7] };
-                BitArray bitArray = new BitArray(bytes);
+                //byte[] bytes = new byte[1] { arrivalData[7] };
+                //BitArray bitArray = new BitArray(bytes);
+                //_PrinterState = PrinterState.NotPrinting;
+                //if (bitArray[0])
+                //{
+                //    _PrinterState = PrinterState.Printing;
+                //}
+                //else if (bitArray[2])
+                //{
+                //    _PrinterState = PrinterState.Fault;
+                //}
+
                 _PrinterState = PrinterState.NotPrinting;
-                if (bitArray[0])
+                switch (arrivalData[7])
                 {
-                    _PrinterState = PrinterState.Printing;
-                }
-                else if (bitArray[2])
-                {
-                    _PrinterState = PrinterState.Fault;
+                    case 0:
+                    case 1:
+                        _PrinterState = PrinterState.NotPrinting;
+                        break;
+
+                    case 4:
+                        _PrinterState &= ~PrinterState.Printing;
+                        break;
                 }
 
                 if (printerState != _PrinterState)
@@ -1666,7 +1717,7 @@ namespace KGKJetPrinterLib
 
         private void OnTimedEvent1(object source, ElapsedEventArgs e)
         {
-            SendCommand("\u0002GRC:0:1:\u0003", SendCommandType.CheckState);
+            GetStatusMachineSimple();
         }
 
         private void OnTimedEvent2(object source, ElapsedEventArgs e)
@@ -1728,6 +1779,44 @@ namespace KGKJetPrinterLib
         }
         #endregion
 
+        public class TextModuleParameters
+        {
+            public string CommandVersion; // 1 fixed
+            public string ModuleNo; // 1 ~ 500: No. 1 ~ 500, D: Default data
+            public string VerticalDots; // 1: 5dots, 2: 7dots, 3: 9dots, 4: 10dots, 5: 12dots, 6: 16dots, 7: 20dots, 8: 22dots, 9: 24dots, A: 26dots, E: 11 dots, F: 15 dots
+            public string FontSize; // 2: 24x24, 3: 24x18, 4: 16x16, 5: 16x12, 6: 12x10, 7: 10x8, 8: 9x9, 9: 9x7, A: 7x8, B: 7x5, C: 5x5, D: 5xN, E: 7xN
+            public string FontBottomPos; // 00 ~ 25: The font bottom is located at the 0th ~ 25th dot from the lowermost dot
+            public string MultiWidth; // 1 ~ 8: 1 ~ 8-fold
+            public string CharDirection; // 0: ↑, 1: ←, 2: →, 3: ↓
+            public string CharSpacingDot; // 00 ~ 31: 0 ~ 31 dots
+            public string CharSpacingOfFinalChar; // 0: Disabled, 1: Enabled
+            public string FullWidthToCharSpacingDot; // 0: Disabled, 1: Enabled
+            public string Reverse; // 0: Disabled, 1: Enabled
+            public string CharInversion; // 0: Disabled, 1: Horizontal inversion, 2: Vertical inversion
+            public string CharPlacement; // 0: Places the character left to right, 1: Right to left, 2: Top to bottom, 3: Bottom to top
+            public string CodeSystem; // 0: JIS, 1: ASCII, 2: Shift-JIS, 3: ASCII + Shift-JIS, 4: UNICODE, 6: GB, 7: ASCII + GB, 8: KS, 9: ASCII + KS, A: BIG5, B: ASCII + BIG5
+            public string Content;
+
+            public TextModuleParameters()
+            {
+                CommandVersion = "1";
+                ModuleNo = "1";
+                VerticalDots = "A";
+                FontSize = "2";
+                FontBottomPos = "00";
+                MultiWidth = "1";
+                CharDirection = "0";
+                CharSpacingDot = "00";
+                CharSpacingOfFinalChar = "0";
+                FullWidthToCharSpacingDot = "1";
+                Reverse = "0";
+                CharInversion = "0";
+                CharPlacement = "0";
+                CodeSystem = "3";
+                Content = "";
+
+            }
+        }
         public class MessageParameters
         {
             public bool Reverse;
