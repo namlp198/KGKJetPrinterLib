@@ -46,12 +46,38 @@ namespace KGKJetPrinterLib
             Decrement,
             Increment
         }
-        public enum PrinterState
+        public enum PrintHeadState
         {
             Unknown,
-            NotPrinting,
-            Printing,
-            Fault
+            Stopping, // 0
+            StoppingAndCoverOpen, // 1
+            PreparationOfRunning, // 2
+            PreparationOfRunningAndCoverOpen, // 3
+            Running, // 4
+            PreparationOfStopping, // 5
+            Maintenance // 6
+        }
+        public enum PrintHeadHeaterState
+        {
+            Unknown,
+            OFF, // 0
+            ON // 1
+        }
+        public enum VisicosityState
+        {
+            Unknown,
+            Normal, // 0
+            Low, // 1
+            High, // 2
+            NotPerformed // 3
+        }
+        public enum LiquidQuantity
+        {
+            Unknown,
+            Low, // 0
+            Full, // 1
+            Empty, // 2
+            SensorTrouble // 3
         }
         public enum ConnectionState
         {
@@ -73,7 +99,7 @@ namespace KGKJetPrinterLib
         public ConnectionState GetState => _State;
 
         [Browsable(false)]
-        public PrinterState GetPrinterState => _PrinterState;
+        public PrintHeadState GetPrinterState => _PrintHeadState;
 
         private static List<WeakReference> __ENCList = new List<WeakReference>();
 
@@ -101,7 +127,17 @@ namespace KGKJetPrinterLib
 
         private clsRegistration registration;
 
-        private PrinterState _PrinterState;
+        private PrintHeadState _PrintHeadState;
+
+        private PrintHeadHeaterState _PrintHeadHeaterState;
+
+        private LiquidQuantity _LiquidQuantityInkTankState;
+
+        private LiquidQuantity _LiquidQuantitySolventTankState;
+
+        private LiquidQuantity _LiquidQuantityMainTankState;
+
+        private VisicosityState _VisicosityState;
 
         private string _PrinterArrivalData;
 
@@ -208,7 +244,12 @@ namespace KGKJetPrinterLib
             _State = ConnectionState.Closed;
             _byteBuffer = new byte[1025];
             registration = new clsRegistration();
-            _PrinterState = PrinterState.Unknown;
+            _PrintHeadState = PrintHeadState.Unknown;
+            _PrintHeadHeaterState = PrintHeadHeaterState.Unknown;
+            _LiquidQuantityInkTankState = LiquidQuantity.Unknown;
+            _LiquidQuantitySolventTankState = LiquidQuantity.Unknown;
+            _LiquidQuantityMainTankState = LiquidQuantity.Unknown;
+            _VisicosityState = VisicosityState.Unknown;
             _IsDataArrival = false;
             _SendCommandType = SendCommandType.Control;
             _WaitingData = false;
@@ -248,7 +289,8 @@ namespace KGKJetPrinterLib
 
         public delegate void ConnectionStateChangedEventHandler(KGKJetPrinter sender, ConnectionState state);
 
-        public delegate void PrinterStateChangedEventHandler(KGKJetPrinter sender, PrinterState state);
+        public delegate void PrinterStateChangedEventHandler(KGKJetPrinter sender, PrintHeadState printHeadState, PrintHeadHeaterState heaterState, 
+                                                             LiquidQuantity inkTankState, LiquidQuantity solventState, LiquidQuantity mainTankState, VisicosityState visState);
 
         private delegate void MessagePrintCompletedEventHandler(KGKJetPrinter sender);
 
@@ -850,11 +892,11 @@ namespace KGKJetPrinterLib
         /// 4: Running, 
         /// 5: Preparation of stopping, 
         /// 6: While maintenance</list></returns>
-        public bool GetStatusMachineSimple()
+        public bool GetMachineStatus()
         {
-            return SendCommand("\u0002GSS:0:1:3:\u0003", SendCommandType.CheckState);
+            return SendCommand("\u0002GSS:0:1:350124:\u0003", SendCommandType.CheckState); // head print -> head print heater -> ink tank -> solvent tank -> main tank -> visicosity
         }
-
+       
         #endregion
 
         public bool StartJet()
@@ -1120,8 +1162,8 @@ namespace KGKJetPrinterLib
         private void CheckPrinterState()
         {
             byte[] arrivalData = _ArrivalData;
-            PrinterState printerState = _PrinterState;
-            if (arrivalData.Count() >= 8)
+            PrintHeadState prindHeadState = _PrintHeadState;
+            if (arrivalData.Count() >= 26)
             {
                 //byte[] bytes = new byte[1] { arrivalData[7] };
                 //BitArray bitArray = new BitArray(bytes);
@@ -1135,24 +1177,49 @@ namespace KGKJetPrinterLib
                 //    _PrinterState = PrinterState.Fault;
                 //}
 
-                _PrinterState = PrinterState.NotPrinting;
-                switch (arrivalData[7])
+                //                                  13             15            17          19          21           23
+                // example ACK: 6 2 0:1:350124:[PrintHead]:[PrintHeadHeater]:[InkTank]:[SolventTank]:[MainTank]:[Visicosity]:3
+                // index 13: print head state
+                char chPrintHead = Encoding.ASCII.GetChars(arrivalData)[13];
+                switch (chPrintHead)
                 {
-                    case 0:
-                    case 1:
-                        _PrinterState = PrinterState.NotPrinting;
+                    case '0':
+                        _PrintHeadState = PrintHeadState.Stopping;
                         break;
-
-                    case 4:
-                        _PrinterState &= ~PrinterState.Printing;
+                    case '1':
+                        _PrintHeadState = PrintHeadState.StoppingAndCoverOpen;
+                        break;
+                    case '2':
+                        _PrintHeadState = PrintHeadState.PreparationOfRunning;
+                        break;
+                    case '3':
+                        _PrintHeadState = PrintHeadState.PreparationOfRunningAndCoverOpen;
+                        break;
+                    case '4':
+                        _PrintHeadState = PrintHeadState.Running;
+                        break;
+                    case '5':
+                        _PrintHeadState = PrintHeadState.PreparationOfStopping;
+                        break;
+                    case '6':
+                        _PrintHeadState = PrintHeadState.Maintenance;
                         break;
                 }
-
-                if (printerState != _PrinterState)
+                if (prindHeadState != _PrintHeadState)
                 {
-                    InvokeMethod(OnPrinterStateChanged);
+                    //InvokeMethod(OnPrinterStateChanged);
+                    PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState, 
+                        _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
                 }
             }
+        }
+        private void CheckLiquidQuantityState()
+        {
+
+        }
+        private void CheckPrintHeadHeaterStateAndViscosity()
+        {
+
         }
 
         private string GetArrivalData()
@@ -1264,7 +1331,8 @@ namespace KGKJetPrinterLib
 
         private void CheckConnectionState(KGKJetPrinter sender, ConnectionState state)
         {
-            InvokeAction(OnConnectionStateChanged, sender);
+            //InvokeAction(OnConnectionStateChanged, sender);
+            ConnectionStateChanged?.Invoke(sender, _State);
         }
 
         private void OnConnectionStateChanged(KGKJetPrinter sender)
@@ -1274,7 +1342,8 @@ namespace KGKJetPrinterLib
 
         private void OnPrinterStateChanged()
         {
-            PrinterStateChanged?.Invoke(this, _PrinterState);
+            PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState,
+                        _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
         }
 
         private string GetFontCode(FontType pFont)
@@ -1656,8 +1725,15 @@ namespace KGKJetPrinterLib
                 Timer2.Start();
                 _WaitingData = false;
                 _SendCommandType = SendCommandType.Control;
-                _PrinterState = PrinterState.Unknown;
-                InvokeMethod(OnPrinterStateChanged);
+                _PrintHeadState = PrintHeadState.Unknown;
+                _PrintHeadHeaterState = PrintHeadHeaterState.Unknown;
+                _LiquidQuantityInkTankState = LiquidQuantity.Unknown;
+                _LiquidQuantitySolventTankState = LiquidQuantity.Unknown;
+                _LiquidQuantityMainTankState = LiquidQuantity.Unknown;
+                _VisicosityState = VisicosityState.Unknown;
+                //InvokeMethod(OnPrinterStateChanged);
+                PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState,
+                        _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
             }
             catch (Exception ex)
             {
@@ -1717,7 +1793,7 @@ namespace KGKJetPrinterLib
 
         private void OnTimedEvent1(object source, ElapsedEventArgs e)
         {
-            GetStatusMachineSimple();
+            GetMachineStatus();
         }
 
         private void OnTimedEvent2(object source, ElapsedEventArgs e)
@@ -1746,7 +1822,8 @@ namespace KGKJetPrinterLib
                     if (num > _LastPrintCount)
                     {
                         _diff = checked((int)(num - _LastPrintCount));
-                        InvokeMethod(OnPrintCompleted);
+                        //InvokeMethod(OnPrintCompleted);
+                        MessagePrintCompleted?.Invoke(this);
                     }
 
                     _LastPrintCount = num;
@@ -1763,7 +1840,7 @@ namespace KGKJetPrinterLib
 
         private void PrinterStateChangedHandle()
         {
-            if (_PrinterState == PrinterState.Printing)
+            if (_PrintHeadState == PrintHeadState.Running)
             {
                 CheckFinishPrintTimer.Start();
             }
