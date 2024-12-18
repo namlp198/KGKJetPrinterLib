@@ -214,6 +214,28 @@ namespace KGKJetPrinterLib
                 throw new Exception("Must be closed to set the remote ip.");
             }
         }
+        private bool m_bAutoReconnect = false;
+        public bool AutoReconnect
+        {
+            get => m_bAutoReconnect;
+            set
+            {
+                m_bAutoReconnect = value;
+            }
+        }
+
+        private int m_nCurrentMessageNo = -1;
+        public int CurrentMessageNo
+        {
+            get => m_nCurrentMessageNo;
+            set
+            {
+                if (m_nCurrentMessageNo != value)
+                {
+                    m_nCurrentMessageNo = value;
+                }
+            }
+        }
         #endregion
 
         #region Constructor
@@ -254,7 +276,7 @@ namespace KGKJetPrinterLib
             _SendCommandType = SendCommandType.Control;
             _WaitingData = false;
             _ATTRIB = "000000";
-            _LastPrintCount = uint.MaxValue;
+            _LastPrintCount = 0;
             _diff = 0;
             checked
             {
@@ -289,10 +311,13 @@ namespace KGKJetPrinterLib
 
         public delegate void ConnectionStateChangedEventHandler(KGKJetPrinter sender, ConnectionState state);
 
-        public delegate void PrinterStateChangedEventHandler(KGKJetPrinter sender, PrintHeadState printHeadState, PrintHeadHeaterState heaterState, 
+        public delegate void PrinterStateChangedEventHandler(KGKJetPrinter sender, PrintHeadState printHeadState, PrintHeadHeaterState heaterState,
                                                              LiquidQuantity inkTankState, LiquidQuantity solventState, LiquidQuantity mainTankState, VisicosityState visState);
 
+        public delegate void PrintCountChangedHandler(KGKJetPrinter sender);
+
         private delegate void MessagePrintCompletedEventHandler(KGKJetPrinter sender);
+
 
         [method: DebuggerNonUserCode]
         public event ConnectedEventHandler Connected;
@@ -317,6 +342,9 @@ namespace KGKJetPrinterLib
 
         [method: DebuggerNonUserCode]
         public event PrinterStateChangedEventHandler PrinterStateChanged;
+
+        [method: DebuggerNonUserCode]
+        public event PrintCountChangedHandler PrintCountChanged;
 
         [method: DebuggerNonUserCode]
         private event MessagePrintCompletedEventHandler MessagePrintCompleted;
@@ -835,6 +863,18 @@ namespace KGKJetPrinterLib
             Dispose();
             Interaction.MsgBox("License Key is invalid");
         }
+        public void DisconnectPrinter()
+        {
+            if (registration.GetRegistered)
+            {
+                Close();
+                Disconnected?.Invoke(this);
+                return;
+            }
+
+            Dispose();
+            Interaction.MsgBox("License Key is invalid");
+        }
 
         #region KGK Cmd
         public bool StartPrinting()
@@ -874,10 +914,28 @@ namespace KGKJetPrinterLib
         /// </summary>
         /// <param name="content"></param>
         /// <returns></returns>
-        public bool UpdateTextModuleNoChangeAttributes(string content)
+        public bool UpdateTextModuleNoChangeAttributes(string content, int nNoModule)
         {
-            string text = "\u0002STM:1:1::3" + content + ":\u0003";
+            string text = "\u0002STM:1:" + nNoModule + "::3" + content + ":\u0003";
             return SendControlCommand(text);
+        }
+
+        public bool ResetPrintCounter(int nMessageNo)
+        {
+            string cmd = "\u0002RDP:0:1:" + nMessageNo + ":\u0003";
+            return SendControlCommand(cmd);
+        }
+
+        private string GetPrintCounter()
+        {
+            string cmd = "\u0002GDP:0:1:" + m_nCurrentMessageNo + ":\u0003";
+            string printerData = GetPrinterData(cmd);
+            if (Versioned.IsNumeric(printerData))
+            {
+                return printerData;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -896,7 +954,7 @@ namespace KGKJetPrinterLib
         {
             return SendCommand("\u0002GSS:0:1:350124:\u0003", SendCommandType.CheckState); // head print -> head print heater -> ink tank -> solvent tank -> main tank -> visicosity
         }
-       
+
         #endregion
 
         public bool StartJet()
@@ -1208,8 +1266,9 @@ namespace KGKJetPrinterLib
                 if (prindHeadState != _PrintHeadState)
                 {
                     //InvokeMethod(OnPrinterStateChanged);
-                    PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState, 
+                    PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState,
                         _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
+                    PrinterStateChangedHandle();
                 }
             }
         }
@@ -1236,8 +1295,8 @@ namespace KGKJetPrinterLib
                         try
                         {
                             byte[] arrivalData = _ArrivalData;
-                            byte[] array = new byte[arrivalData.Length - 3 + 1];
-                            Array.Copy(arrivalData, 1, array, 0, arrivalData.Length - 2);
+                            byte[] array = new byte[arrivalData.Length - 10]; // sub 10 byte format, the byte remain is indicator for print count
+                            Array.Copy(arrivalData, 8, array, 0, arrivalData.Length - 10);
                             _PrinterArrivalData = ASCIIBytesToString(array);
                             result = _PrinterArrivalData;
                         }
@@ -1348,7 +1407,7 @@ namespace KGKJetPrinterLib
 
         private string GetFontCode(FontType pFont)
         {
-            switch((int)pFont)
+            switch ((int)pFont)
             {
                 case 7: return "00";
                 case 9:
@@ -1722,7 +1781,8 @@ namespace KGKJetPrinterLib
                 }
 
                 Timer1.Stop();
-                Timer2.Start();
+                if (m_bAutoReconnect)
+                    Timer2.Start();
                 _WaitingData = false;
                 _SendCommandType = SendCommandType.Control;
                 _PrintHeadState = PrintHeadState.Unknown;
@@ -1815,7 +1875,7 @@ namespace KGKJetPrinterLib
         {
             try
             {
-                string printCount = GetPrintCount();
+                string printCount = GetPrintCounter();
                 if (!Information.IsNothing(printCount))
                 {
                     uint num = Conversions.ToUInteger(printCount);
@@ -1823,7 +1883,10 @@ namespace KGKJetPrinterLib
                     {
                         _diff = checked((int)(num - _LastPrintCount));
                         //InvokeMethod(OnPrintCompleted);
-                        MessagePrintCompleted?.Invoke(this);
+                        //MessagePrintCompleted?.Invoke(this);
+                        _LastPrintCount = num;
+                        PrintCountChanged?.Invoke(this);
+                        return;
                     }
 
                     _LastPrintCount = num;
