@@ -895,7 +895,7 @@ namespace KGKJetPrinterLib
         public bool SelectMessage(int nMessageNo)
         {
             string text = "\u0002SMN:0:1:" + nMessageNo + ":\u0003";
-            return SendControlCommand(text);
+            return SendCommand(text, SendCommandType.Control);
         }
         /// <summary>
         /// Data return: 0:1:xx , where: xx is Message No
@@ -917,13 +917,13 @@ namespace KGKJetPrinterLib
         public bool UpdateTextModuleNoChangeAttributes(string content, int nNoModule)
         {
             string text = "\u0002STM:1:" + nNoModule + "::3" + content + ":\u0003";
-            return SendControlCommand(text);
+            return SendCommand(text, SendCommandType.Control);
         }
 
         public bool ResetPrintCounter(int nMessageNo)
         {
             string cmd = "\u0002RDP:0:1:" + nMessageNo + ":\u0003";
-            return SendControlCommand(cmd);
+            return SendCommand(cmd, SendCommandType.Control);
         }
 
         private string GetPrintCounter()
@@ -1268,7 +1268,8 @@ namespace KGKJetPrinterLib
                     //InvokeMethod(OnPrinterStateChanged);
                     PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState,
                         _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
-                    PrinterStateChangedHandle();
+                    
+                    //PrinterStateChangedHandle(); tam thoi tat timer get print count
                 }
             }
         }
