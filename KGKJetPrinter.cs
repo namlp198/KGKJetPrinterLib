@@ -923,10 +923,11 @@ namespace KGKJetPrinterLib
         public bool ResetPrintCounter(int nMessageNo)
         {
             string cmd = "\u0002RDP:0:1:" + nMessageNo + ":\u0003";
-            return SendCommand(cmd, SendCommandType.Control);
+            bool res = SendCommand(cmd, SendCommandType.Control);
+            return res;
         }
 
-        private string GetPrintCounter()
+        public string GetPrintCounter()
         {
             string cmd = "\u0002GDP:0:1:" + m_nCurrentMessageNo + ":\u0003";
             string printerData = GetPrinterData(cmd);
@@ -1220,25 +1221,46 @@ namespace KGKJetPrinterLib
         private void CheckPrinterState()
         {
             byte[] arrivalData = _ArrivalData;
+
             PrintHeadState prindHeadState = _PrintHeadState;
+            LiquidQuantity inkTankState = _LiquidQuantityInkTankState;
+            LiquidQuantity solventTankState = _LiquidQuantitySolventTankState;
+            LiquidQuantity mainTankState = _LiquidQuantityMainTankState;
+            VisicosityState visicosityState = _VisicosityState;
+
             if (arrivalData.Count() >= 26)
             {
-                //byte[] bytes = new byte[1] { arrivalData[7] };
-                //BitArray bitArray = new BitArray(bytes);
-                //_PrinterState = PrinterState.NotPrinting;
-                //if (bitArray[0])
-                //{
-                //    _PrinterState = PrinterState.Printing;
-                //}
-                //else if (bitArray[2])
-                //{
-                //    _PrinterState = PrinterState.Fault;
-                //}
+                /*byte[] bytes = new byte[1] { arrivalData[7] };
+                BitArray bitArray = new BitArray(bytes);
+                _PrinterState = PrinterState.NotPrinting;
+                if (bitArray[0])
+                {
+                    _PrinterState = PrinterState.Printing;
+                }
+                else if (bitArray[2])
+                {
+                    _PrinterState = PrinterState.Fault;
+                }*/
 
                 //                                  13             15            17          19          21           23
                 // example ACK: 6 2 0:1:350124:[PrintHead]:[PrintHeadHeater]:[InkTank]:[SolventTank]:[MainTank]:[Visicosity]:3
+
                 // index 13: print head state
                 char chPrintHead = Encoding.ASCII.GetChars(arrivalData)[13];
+
+                // index 17: ink tank state
+                char chInkTank = Encoding.ASCII.GetChars(arrivalData)[17];
+
+                // index 19: solvent tank state
+                char chSolventTank = Encoding.ASCII.GetChars(arrivalData)[19];
+
+                // index 21: main tank state
+                char chMainTank = Encoding.ASCII.GetChars(arrivalData)[21];
+
+                // index 23: main viscosity state
+                char chviscosity = Encoding.ASCII.GetChars(arrivalData)[23];
+
+                // CHECK PRINT HEAD STATE
                 switch (chPrintHead)
                 {
                     case '0':
@@ -1263,13 +1285,95 @@ namespace KGKJetPrinterLib
                         _PrintHeadState = PrintHeadState.Maintenance;
                         break;
                 }
-                if (prindHeadState != _PrintHeadState)
+
+                // CHECK INK TANK STATE
+                switch (chInkTank)
+                {
+                    case '0':
+                        _LiquidQuantityInkTankState = LiquidQuantity.Low;
+                        break;
+                    case '1':
+                        _LiquidQuantityInkTankState = LiquidQuantity.Full;
+                        break;
+                    case '2':
+                        _LiquidQuantityInkTankState = LiquidQuantity.Empty;
+                        break;
+                    case '3':
+                        _LiquidQuantityInkTankState = LiquidQuantity.SensorTrouble;
+                        break;
+                    default:
+                        _LiquidQuantityInkTankState = LiquidQuantity.Unknown;
+                        break;
+                }
+
+                // CHECK SOLVENT TANK STATE
+                switch (chSolventTank)
+                {
+                    case '0':
+                        _LiquidQuantitySolventTankState = LiquidQuantity.Low;
+                        break;
+                    case '1':
+                        _LiquidQuantitySolventTankState = LiquidQuantity.Full;
+                        break;
+                    case '2':
+                        _LiquidQuantitySolventTankState = LiquidQuantity.Empty;
+                        break;
+                    case '3':
+                        _LiquidQuantitySolventTankState = LiquidQuantity.SensorTrouble;
+                        break;
+                    default:
+                        _LiquidQuantitySolventTankState = LiquidQuantity.Unknown;
+                        break;
+                }
+
+                // CHECK MAIN TANK STATE
+                switch (chMainTank)
+                {
+                    case '0':
+                        _LiquidQuantityMainTankState = LiquidQuantity.Low;
+                        break;
+                    case '1':
+                        _LiquidQuantityMainTankState = LiquidQuantity.Full;
+                        break;
+                    case '2':
+                        _LiquidQuantityMainTankState = LiquidQuantity.Empty;
+                        break;
+                    case '3':
+                        _LiquidQuantityMainTankState = LiquidQuantity.SensorTrouble;
+                        break;
+                    default:
+                        _LiquidQuantityMainTankState = LiquidQuantity.Unknown;
+                        break;
+                }
+
+                // CHECK VISCOSITY STATE
+                switch (chviscosity)
+                {
+                    case '0':
+                        _VisicosityState = VisicosityState.Normal;
+                        break;
+                    case '1':
+                        _VisicosityState = VisicosityState.Low;
+                        break;
+                    case '2':
+                        _VisicosityState = VisicosityState.High;
+                        break;
+                    case '3':
+                        _VisicosityState = VisicosityState.NotPerformed;
+                        break;
+                    default:
+                        _VisicosityState = VisicosityState.Unknown;
+                        break;
+                }
+
+                if (prindHeadState != _PrintHeadState || inkTankState != _LiquidQuantityInkTankState || solventTankState != _LiquidQuantitySolventTankState
+                    || mainTankState != _LiquidQuantityMainTankState || visicosityState != _VisicosityState)
                 {
                     //InvokeMethod(OnPrinterStateChanged);
                     PrinterStateChanged?.Invoke(this, _PrintHeadState, _PrintHeadHeaterState,
                         _LiquidQuantityInkTankState, _LiquidQuantitySolventTankState, _LiquidQuantityMainTankState, _VisicosityState);
-                    
-                    //PrinterStateChangedHandle(); tam thoi tat timer get print count
+
+                    //PrinterStateChangedHandle(); ***ghi chu quan trong: TAM THOI TAT timer get print count
                 }
             }
         }
