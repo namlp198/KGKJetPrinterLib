@@ -236,6 +236,32 @@ namespace KGKJetPrinterLib
                 }
             }
         }
+
+        private bool m_bUseTimerCheckPrintState = true;
+        public bool UseTimerCheckPrintState
+        {
+            get => m_bUseTimerCheckPrintState;
+            set => m_bUseTimerCheckPrintState= value;
+        }
+
+        private bool m_bUseTimerCheckPrintCount = true;
+        public bool UseTimerCheckPrintCount
+        {
+            get => m_bUseTimerCheckPrintCount;
+            set => m_bUseTimerCheckPrintCount = value;
+        }
+        private int m_nDelayTimeCheckPrintState = 3000;
+        public int DelayTimeCheckPrintState
+        {
+            get => m_nDelayTimeCheckPrintState;
+            set => m_nDelayTimeCheckPrintState= value;
+        }
+        private int m_nDelayTimeCheckPrintCount = 500;
+        public int DelayTimeCheckPrintCount
+        {
+            get => m_nDelayTimeCheckPrintCount;
+            set => m_nDelayTimeCheckPrintCount = value;
+        }
         #endregion
 
         #region Constructor
@@ -1859,8 +1885,16 @@ namespace KGKJetPrinterLib
                     iniTimer2();
                 }
 
-                Timer1.Start();
-                Timer2.Stop();
+                if(m_bUseTimerCheckPrintState)
+                {
+                    Timer1.Start();
+                    Timer2.Stop();
+                }
+
+                if(m_bUseTimerCheckPrintCount)
+                {
+                    CheckFinishPrintTimer.Start();
+                }
             }
             catch (Exception ex)
             {
@@ -1911,7 +1945,7 @@ namespace KGKJetPrinterLib
 
         private void iniTimer1()
         {
-            Timer1 = new System.Timers.Timer(1000.0);
+            Timer1 = new System.Timers.Timer(m_nDelayTimeCheckPrintState);
             Timer1.Elapsed += OnTimedEvent1;
             Timer1.AutoReset = true;
         }
@@ -1938,7 +1972,7 @@ namespace KGKJetPrinterLib
             Timer2.Enabled = false;
             iniTimer3();
             Timer3.Enabled = false;
-            CheckFinishPrintTimer = new System.Timers.Timer(500.0);
+            CheckFinishPrintTimer = new System.Timers.Timer(m_nDelayTimeCheckPrintCount);
             CheckFinishPrintTimer.Elapsed += OnTimedEventCheckFinishPrintTimer;
             CheckFinishPrintTimer.AutoReset = true;
             CheckFinishPrintTimer.Enabled = false;
