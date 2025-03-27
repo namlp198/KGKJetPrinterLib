@@ -920,8 +920,8 @@ namespace KGKJetPrinterLib
         /// <returns></returns>
         public bool SelectMessage(int nMessageNo)
         {
-            string text = "\u0002SMN:0:1:" + nMessageNo + ":\u0003";
-            return SendCommand(text, SendCommandType.Control);
+            string cmd = "\u0002SMN:0:1:" + nMessageNo + ":\u0003";
+            return SendControlCommand(cmd);
         }
         /// <summary>
         /// Data return: 0:1:xx , where: xx is Message No
@@ -942,15 +942,14 @@ namespace KGKJetPrinterLib
         /// <returns></returns>
         public bool UpdateTextModuleNoChangeAttributes(string content, int nNoModule)
         {
-            string text = "\u0002STM:1:" + nNoModule + "::3" + content + ":\u0003";
-            return SendCommand(text, SendCommandType.Control);
+            string cmd = "\u0002STM:1:" + nNoModule + "::3" + content + ":\u0003";
+            return SendControlCommand(cmd);
         }
 
         public bool ResetPrintCounter(int nMessageNo)
         {
             string cmd = "\u0002RDP:0:1:" + nMessageNo + ":\u0003";
-            bool res = SendCommand(cmd, SendCommandType.Control);
-            return res;
+            return SendControlCommand(cmd);
         }
 
         public string GetPrintCounter()
@@ -981,7 +980,20 @@ namespace KGKJetPrinterLib
         {
             return SendCommand("\u0002GSS:0:1:350124:\u0003", SendCommandType.CheckState); // head print -> head print heater -> ink tank -> solvent tank -> main tank -> visicosity
         }
-
+        public void StartPrintCountTimer()
+        {
+            if (m_bUseTimerCheckPrintCount)
+            {
+                CheckFinishPrintTimer.Start();
+            }
+        }
+        public void StopPrintCountTimer()
+        {
+            if (m_bUseTimerCheckPrintCount)
+            {
+                CheckFinishPrintTimer.Stop();
+            }
+        }
         #endregion
 
         public bool StartJet()
@@ -1889,11 +1901,6 @@ namespace KGKJetPrinterLib
                 {
                     Timer1.Start();
                     Timer2.Stop();
-                }
-
-                if(m_bUseTimerCheckPrintCount)
-                {
-                    CheckFinishPrintTimer.Start();
                 }
             }
             catch (Exception ex)
