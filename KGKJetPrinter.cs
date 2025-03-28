@@ -1429,7 +1429,7 @@ namespace KGKJetPrinterLib
             int num = 1;
             checked
             {
-                string result;
+                string result = string.Empty;
                 while (true)
                 {
                     if (_IsDataArrival)
@@ -1438,10 +1438,19 @@ namespace KGKJetPrinterLib
                         try
                         {
                             byte[] arrivalData = _ArrivalData;
-                            byte[] array = new byte[arrivalData.Length - 10]; // sub 10 byte format, the byte remain is indicator for print count
-                            Array.Copy(arrivalData, 8, array, 0, arrivalData.Length - 10);
-                            _PrinterArrivalData = ASCIIBytesToString(array);
-                            result = _PrinterArrivalData;
+
+                            bool res = arrivalData.Count() > 10 && arrivalData[0] == 6;
+                            if (res)
+                            {
+                                byte[] array = new byte[arrivalData.Length - 10]; // sub 10 byte format, the byte remain is indicator for print count
+                                Array.Copy(arrivalData, 8, array, 0, arrivalData.Length - 10);
+                                _PrinterArrivalData = ASCIIBytesToString(array);
+                                result = _PrinterArrivalData;
+                            }
+                            else
+                            {
+                                return result;
+                            }
                         }
                         catch (Exception ex)
                         {
